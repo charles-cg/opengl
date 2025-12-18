@@ -1,101 +1,91 @@
 #include "config.h"
 
-GLuint make_shader(const std::string& vertex_filepath, const std::string& fragment_filepath);
+// array with vertices coordinates
+std::vector<GLfloat> vertices = {
+    -0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f,    // lower left corner
+    0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f,     // lower right corner
+    0.0f, 0.5f * float(sqrt(3)) * 2 / 3, 0.0f,  // upper corner
+    -0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f, // inner left
+    0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f,  // inner right
+    0.0f, -0.5f * float(sqrt(3)) / 3, 0.0f      // inner down
+};
 
-GLuint make_module(const std::string& filepath, GLuint module_type);
+// array for indices
+std::vector<GLuint> indices = {
+    0, 3, 5, // lower left triangle
+    3, 2, 4, // lower right triangle
+    5, 4, 1  // upper triangle
+};
 
 int main() {
+	// initialize glfw
+	glfwInit();
 
-    GLFWwindow* window;
+	// specify the version used, this has to be the same as the GLAD version
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    if (!glfwInit()) {
-        std::cout << "GLFW could not start properly!" << std::endl;
-        return -1;
-    }
+	// instantiate a GLFWwindow object, the constructor is (width, height, title, fullscreen, share resources)
+	GLFWwindow* window = glfwCreateWindow(800, 800, "Graphics Programming", NULL, NULL);
+	// error handling if the window could not be created
+	if (window == NULL) {
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
 
-    window = glfwCreateWindow(640, 480, "My Window", NULL, NULL);
-    glfwMakeContextCurrent(window);
+		return -1;
+	}
+	
+	// introduce this new window into the context
+	glfwMakeContextCurrent(window);
 
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        glfwTerminate();
-        return -1;
-    }
+	// GLAD configures open gl
+	gladLoadGL();
 
-    glClearColor(0.25f, 0.5f, 0.75f, 1.0f);
+	// viewport of open gl
+	glViewport(0, 0, 800, 800);
 
-    GLuint shader = make_shader(
-        "../shaders/default.vert",
-        "../shaders/default.frag"
-    );
+    Shader shaderProgram("../shaders/default.vert", "../shaders/default.frag");
 
-    while(!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+    VAO VAO1;
+    VAO1.Bind();
 
-        glClear(GL_COLOR_BUFFER_BIT);
-        glUseProgram(shader);
-        glfwSwapBuffers(window);
-    }
+    VBO VBO1(vertices, vertices.size() * sizeof(GLfloat));
+    EBO EBO1(indices, indices.size() * sizeof(GLuint));
 
-    glDeleteProgram(shader);
-    glfwTerminate();
-    return 0;
-}
+    VAO1.linkVBO(VBO1, 0);
+    VAO1.Unbind();
+    VBO1.Unbind();
+    EBO1.Unbind();
 
-GLuint make_shader(const std::string& vertex_filepath, const std::string& fragment_filepath) {
-    std::vector<GLuint> modules;
-    modules.push_back(make_module(vertex_filepath, GL_VERTEX_SHADER));
-    modules.push_back(make_module(fragment_filepath, GL_FRAGMENT_SHADER));
+	// loop to check if the close button has been pressed
+	while (!glfwWindowShouldClose(window)) {
+        // specify a color to display
+		glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
+        // clean back buffer and assign it this color buffer
+		glClear(GL_COLOR_BUFFER_BIT);
+		// specify opengl which shader program to use
+        shaderProgram.Activate();
+		// bind the vao so opengl know how to use it
+		VAO1.Bind();
+		// call the triangle primitive to draw it
+		glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_INT, 0);
+	    // swap the front buffer with this back buffer
+		glfwSwapBuffers(window);
+		// take care of glfw buffers
+		glfwPollEvents();
+	}
 
-    GLuint shader = glCreateProgram();
-    for (unsigned int shaderModule : modules) {
-        glAttachShader(shader, shaderModule);
-    }
-    glLinkProgram(shader);
+	// delete VAO, VBO and program to clean up
+	VAO1.Delete();
+	VBO1.Delete();
+	EBO1.Delete();
+	shaderProgram.Delete();
 
-    int success;
-    glGetProgramiv(shader, GL_LINK_STATUS, &success);
-    if (!success) {
-        char errorLog[1024];
-        glGetProgramInfoLog(shader, 1024, NULL, errorLog);
-        std::cout << "Shader Linking error:\n" << errorLog << std::endl;
-    }
+	// if the button is pressed destroy the window instantiation
+	glfwDestroyWindow(window);
 
-    for (unsigned int shaderModule : modules) {
-        glDeleteShader(shaderModule);
-    }   
-
-    return shader;
-}
-
-GLuint make_module(const std::string& filepath, GLuint module_type) {
-    std::ifstream file;
-    std::stringstream bufferedLines;
-    std::string line;
-
-    file.open(filepath);
-    if (!file.is_open()) {
-        std::cout << "ERROR: Could not open shader file: " << filepath << std::endl;
-    }
-    while (std::getline(file, line)) {
-        bufferedLines << line << "\n";
-    }
-
-    std::string shaderSource = bufferedLines.str();
-    const char* shaderSrc = shaderSource.c_str();
-    bufferedLines.str("");
-    file.close();
-
-    GLuint shaderModule = glCreateShader(module_type);
-    glShaderSource(shaderModule, 1, &shaderSrc, NULL);
-    glCompileShader(shaderModule);
-
-    int success;
-    glGetShaderiv(shaderModule, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char errorLog[1024];
-        glGetShaderInfoLog(shaderModule, 1024, NULL, errorLog);
-        std::cout << "Shader Module compilation error:\n" << errorLog << std::endl;
-    }
-
-    return shaderModule;
+	// terminate the program
+	glfwTerminate();
+	return 0;
 }
