@@ -11,6 +11,8 @@ add_executable(hello_window
     src/VAO.cpp
     src/VBO.cpp
     src/EBO.cpp
+    src/stb.cpp
+    src/Texture.cpp
 )
 
 target_include_directories(hello_window PRIVATE dependencies)

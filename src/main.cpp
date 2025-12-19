@@ -2,19 +2,17 @@
 
 // array with vertices coordinates
 std::vector<GLfloat> vertices = {
-    -0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f,    // lower left corner
-    0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f,     // lower right corner
-    0.0f, 0.5f * float(sqrt(3)) * 2 / 3, 0.0f,  // upper corner
-    -0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f, // inner left
-    0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f,  // inner right
-    0.0f, -0.5f * float(sqrt(3)) / 3, 0.0f      // inner down
+//     coordinates    /     color       /  tex coord  //
+    -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, // lower left corner
+    -0.5f,  0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, // upper left corner
+     0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, // upper  rightcorner
+     0.5f, -0.5f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f  // lower left
 };
 
 // array for indices
 std::vector<GLuint> indices = {
-    0, 3, 5, // lower left triangle
-    3, 2, 4, // lower right triangle
-    5, 4, 1  // upper triangle
+	0, 2, 1, // upper triangle
+	0, 3, 2  // lower triangle
 };
 
 int main() {
@@ -45,18 +43,38 @@ int main() {
 	// viewport of open gl
 	glViewport(0, 0, 800, 800);
 
+	// instantiate shader program reading from files
     Shader shaderProgram("../shaders/default.vert", "../shaders/default.frag");
 
+	// instantiate VAO
     VAO VAO1;
+	// Bind this new VAO
     VAO1.Bind();
 
+	// Instantiate VBO
     VBO VBO1(vertices, vertices.size() * sizeof(GLfloat));
+	// Instantiate EBO
     EBO EBO1(indices, indices.size() * sizeof(GLuint));
 
-    VAO1.linkVBO(VBO1, 0);
+	// bind VBO to the VBO
+    VAO1.linkAttrib(VBO1, 0, 3, GL_FLOAT, 8 * sizeof(float), (void*)0);
+	VAO1.linkAttrib(VBO1, 1, 3, GL_FLOAT, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	VAO1.linkAttrib(VBO1, 2, 2, GL_FLOAT, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	// Unbind VAO, VBO and EBO
     VAO1.Unbind();
     VBO1.Unbind();
     EBO1.Unbind();
+
+	GLuint uniID = glGetUniformLocation(shaderProgram.ID, "scale");
+
+	// texture
+
+	int widthImg, heightImg, numColCh;
+	stbi_set_flip_vertically_on_load(true);
+	unsigned char* bytes = stbi_load("../textures/pop_cat.png", &widthImg, &heightImg, &numColCh, 0);
+
+	Texture popCat("../textures/pop_cat.png", GL_TEXTURE_2D, GL_TEXTURE0, GL_RGBA, GL_UNSIGNED_BYTE);
+	popCat.texUnit(shaderProgram, "tex0", 0);
 
 	// loop to check if the close button has been pressed
 	while (!glfwWindowShouldClose(window)) {
@@ -66,10 +84,12 @@ int main() {
 		glClear(GL_COLOR_BUFFER_BIT);
 		// specify opengl which shader program to use
         shaderProgram.Activate();
+		glUniform1f(uniID, 0.5f);
+		popCat.Bind();
 		// bind the vao so opengl know how to use it
 		VAO1.Bind();
 		// call the triangle primitive to draw it
-		glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	    // swap the front buffer with this back buffer
 		glfwSwapBuffers(window);
 		// take care of glfw buffers
@@ -80,6 +100,7 @@ int main() {
 	VAO1.Delete();
 	VBO1.Delete();
 	EBO1.Delete();
+	popCat.Delete();
 	shaderProgram.Delete();
 
 	// if the button is pressed destroy the window instantiation
